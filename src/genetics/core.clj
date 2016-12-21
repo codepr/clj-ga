@@ -1,13 +1,17 @@
-(ns genetics.core
-  (:gen-class)
-  (:require [clojure.data :refer [diff]]))
+;;;; Author Codep
+;;; A really simple implementation of a genetic algorithm based on tournament
+;;; selection
 
+(ns genetics.core (:gen-class) (:require [clojure.data :refer [diff]]))
+
+;;; Algorithm constants
 (def uniform-rate 0.5)
 (def mutation-rate 0.015)
 (def tournament-size 5)
 
-(def individual-size 400)
-(def population-size 20)
+;;; Population sample constants
+(def individual-size 100)
+(def population-size 15)
 
 (defn fitness
   "Calculate the fitness level of an individual"
@@ -41,16 +45,11 @@
   [individual]
   (map (fn [x] (if (< (rand) mutation-rate) (rand-int 2) x)) individual))
 
-(defn tournament
-  "Challenging tournament to build a tournament-size population in order to select
-  new fitter individuals"
-  [population]
-  (repeatedly tournament-size #(rand-nth population)))
-
 (defn tournament-selection
-  "Select individuals for crossover, breed new generation"
+  "Challenging tournament to build a tournament-size population in order to select
+  new fitter individuals. Select individuals for crossover, breed new generation"
   [solution population]
-  (fittest solution (tournament population)))
+  (fittest solution (repeatedly tournament-size #(rand-nth population))))
 
 (defn evolve
   "Evolve the population gradually increasing the fittest individual score"
@@ -66,12 +65,12 @@
   "Iterate through generations till the first evolved gene"
   [solution population max-fitness generation]
   (let [current (fitness solution (fittest solution population))]
-    (when (< current max-fitness)
-      (println "Epoch: " generation " fitness: " current)
+    (println "Epoch: " generation " fitness: " current)
+    (if (< current max-fitness)
       (recur solution (evolve solution population) max-fitness (inc generation)))))
 
 (defn -main
-  "I don't do a whole lot ... yet."
+  "Define input data and start iterations"
   [& args]
   (let [s (repeatedly individual-size #(rand-int 2))
         size (* individual-size population-size)

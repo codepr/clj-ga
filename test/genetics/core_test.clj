@@ -21,3 +21,10 @@
 (deftest crossover-test
   (testing "Crossover function"
     (is (= test-crossover test-crossover))))
+
+(def test-tournament (tournament-selection [1 0 0] [[1 0 0] [1 1 0]]))
+
+(deftest tournament-test
+  (testing "Tournament function"
+    (is (= test-tournament test-tournament))))
+
