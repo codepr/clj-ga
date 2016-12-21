@@ -1,105 +1,79 @@
 (ns genetics.core
-  (:gen-class))
+  (:gen-class)
+  (:require [clojure.data :refer [diff]]))
 
-(use 'clojure.data)
+(def uniform-rate 0.5)
+(def mutation-rate 0.015)
+(def tournament-size 5)
+
+(def individual-size 400)
+(def population-size 20)
 
 (defn fitness
   "Calculate the fitness level of an individual"
   [solution individual]
   (count (remove nil? (peek (diff solution individual)))))
 
+(defn index-of
+  "Clojure doesn't have an index-of function. The Java .indexOf method
+  works reliably for vectors and strings, but not for lists. This solution
+  works for all three."
+  [item coll]
+  (let [v (if (or (vector? coll) (string? coll))
+            coll
+            (apply vector coll))]
+    (.indexOf coll item)))
+
 (defn fittest
-  "Calculate the fittest of the individual according to his fitness level"
-  [solution population max-fitness best]
-  (if (zero? (count population))
-    best
-    (do
-      (def current-max-fitness (fitness solution (first population)))
-      (if (>= current-max-fitness max-fitness)
-        (recur solution (next population) current-max-fitness (first population))
-        (recur solution (next population) max-fitness best)))))
+  "Calculate the fittest of the population according to his fitness level"
+  [solution population]
+  (let [fit-list (map (fn [x] (fitness solution x)) population)]
+    (nth population (index-of (apply max fit-list) fit-list))))
 
-(def s [1 1 1 1 0 1 0 1 1 0 1 1 0 1 0 1 1 0 1 1 0 1 0 1 0 0 1 1 0 0 0 1 1 1 0 1 1 1 0 1])
-(def i [1 1 1 0 1 0 0 0 1 1 1 0 1 0 0 0 1 1 1 0 1 0 0 0 1 1 1 0 1 0 0 0 1 1 1 0 1 0 0 0])
-(def x [1 1 1 0 1 1 0 1 1 1 1 1 0 0 0 0 1 0 1 1 1 1 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 1 0])
-(def y [1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 1 1 0 1 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0])
-(def z [1 1 1 0 1 1 1 1 1 1 1 1 1 0 0 0 1 1 0 0 1 0 1 0 1 0 0 0 1 0 1 0 1 0 0 0 1 1 1 0])
-
-(fittest s (list y x z) 0 z)
-(fitness s x)
-
-(def uniform-rate 0.5)
 
 (defn crossover
-  "Crossover between two individual to breed a new generation"
+  "Breed a new individual by selecting some gene from two parents"
   [individual1 individual2]
-  (if (= 0 (count individual1))
-    '()
-    (if (< (rand) uniform-rate)
-      (cons (first individual1) (crossover (next individual1) (next individual2)))
-      (cons (first individual2) (crossover (next individual1) (next individual2))))))
-
-(crossover s i)
-
-(def mutation-rate 0.015)
+  (map (fn [x y] (if (< (rand) uniform-rate) x y)) individual1 individual2))
 
 (defn mutate
-  "Mutate a gene according to a low chance"
+  "Add a mutation in the individual genome, according to a low factor"
   [individual]
-  (if (zero? (count individual))
-    '()
-    (if (< (rand) mutation-rate)
-      (cons (rand-int 2) (mutate (next individual)))
-      (cons (first individual) (mutate (next individual))))))
-
-(mutate s)
-
-(def tournament-size 5)
+  (map (fn [x] (if (< (rand) mutation-rate) (rand-int 2) x)) individual))
 
 (defn tournament
-  "Select individuals for crossover, breed new generation"
-  [population iteration]
-  (if (= iteration tournament-size)
-    '()
-    (cons
-     (nth population (rand-int tournament-size))
-     (tournament population (inc iteration)))))
-
-(tournament (list x y z x y z x y z y y z y x y z) 0)
+  "Challenging tournament to build a tournament-size population in order to select
+  new fitter individuals"
+  [population]
+  (repeatedly tournament-size #(rand-nth population)))
 
 (defn tournament-selection
   "Select individuals for crossover, breed new generation"
-  [population]
-  (fittest s (tournament population 0) 0 (first population)))
-
-(tournament-selection (list x y z x y z x y z y y z y x y z))
-
-(def elitism-offset true)
+  [solution population]
+  (fittest solution (tournament population)))
 
 (defn evolve
-  "Evolve generation to get fittest"
-  [population iteration]
-  (def new-individual
-    (mutate
-     (crossover
-      (tournament-selection population)
-      (tournament-selection population))))
-  (if (= iteration (count population))
-    '()
-    (cons new-individual (evolve population (inc iteration)))))
-
-(evolve (list y y z i y z i y z y y z y i y z i z y z z) 0)
+  "Evolve the population gradually increasing the fittest individual score"
+  [solution population]
+  (repeatedly
+    (count population)
+    #(mutate
+       (crossover
+         (tournament-selection solution population)
+         (tournament-selection solution population)))))
 
 (defn iterate-generations
   "Iterate through generations till the first evolved gene"
-  [population max-fitness generation]
-  (if (< (fitness s (fittest s population 0 (first population))) max-fitness )
-    (do
-      (println "Generation: " generation " fitness: "(fitness s (fittest s population 0 (first population))))
-      (recur (evolve population 0) max-fitness (inc generation)))
-    ))
+  [solution population max-fitness generation]
+  (let [current (fitness solution (fittest solution population))]
+    (when (< current max-fitness)
+      (println "Epoch: " generation " fitness: " current)
+      (recur solution (evolve solution population) max-fitness (inc generation)))))
 
 (defn -main
   "I don't do a whole lot ... yet."
   [& args]
-  (iterate-generations (list y x z i y z i y z x y z y i y z i x y z z) (fitness s s) 0))
+  (let [s (repeatedly individual-size #(rand-int 2))
+        size (* individual-size population-size)
+        [p f] [(partition individual-size (repeatedly size #(rand-int 2))) (count s)]]
+    (iterate-generations s p f 0)))
