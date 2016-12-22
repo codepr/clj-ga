@@ -13,20 +13,20 @@
 (def individual-size 100)
 (def population-size 15)
 
-(defn fitness
-  "Calculate the fitness level of an individual"
-  [solution individual]
-  (count (remove nil? (peek (diff solution individual)))))
 
 (defn index-of
-  "Clojure doesn't have an index-of function. The Java .indexOf method
-  works reliably for vectors and strings, but not for lists. This solution
-  works for all three."
+  "A reliable function to retrieve the index of a element inside a list, a
+  vector or a string."
   [item coll]
   (let [v (if (or (vector? coll) (string? coll))
             coll
             (apply vector coll))]
     (.indexOf coll item)))
+
+(defn fitness
+  "Calculate the fitness level of an individual"
+  [solution individual]
+  (count (remove nil? (peek (diff solution individual)))))
 
 (defn fittest
   "Calculate the fittest of the population according to his fitness level"
